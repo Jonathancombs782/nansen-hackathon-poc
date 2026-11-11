@@ -2,7 +2,7 @@
 """
 gitlawb × Nansen: Smart Developer Intelligence
 ===============================================
-Proof of Concept — Nansen CLI Hackathon Week 1 (Mar 22, 2026)
+Proof of Concept — Nansen CLI Hackathon Week 1 (Mar 17, 2026)
 
 Instead of asking "is this developer smart money?"
 we flip it: "which smart money wallets are building in crypto?"
@@ -23,13 +23,13 @@ Usage:
     python3 smart_dev_score.py
 """
 
-import subprocess, json, os, sys
+import subprocess, json, os, sys, shlex, shutil
 from pathlib import Path
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
 CHAIN   = "ethereum"
-GL_BIN  = "/Users/kevin/Projects/gitlawb/target/release/gl"
+GL_BIN  = os.environ.get("GL_BIN") or shutil.which("gl")  # `gl` on PATH, or set GL_BIN
 N_DEVS  = 5   # how many smart money wallets to profile
 
 # Fictional gitlawb repos assigned to each smart money wallet for the demo
@@ -43,12 +43,15 @@ REPOS = [
 
 # ── Nansen CLI ────────────────────────────────────────────────────────────────
 
+# Temp dirs holding generated Ed25519 DID keys; removed at end of run (see __main__).
+DID_DIRS: list[str] = []
+
 api_calls = []
 
 def nansen(subcmd: str) -> dict | None:
-    cmd = f"nansen {subcmd}"
-    api_calls.append(cmd)
-    r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    argv = ["nansen"] + shlex.split(subcmd)
+    api_calls.append(" ".join(argv))
+    r = subprocess.run(argv, capture_output=True, text=True)
     if r.returncode != 0:
         return None
     try:
@@ -65,12 +68,18 @@ def nansen(subcmd: str) -> dict | None:
         return None
 
 def gl(subcmd: str) -> str:
-    r = subprocess.run(f"{GL_BIN} {subcmd}", shell=True, capture_output=True, text=True)
+    if not GL_BIN:
+        return ""  # no `gl` binary: callers fall back to the placeholder DID
+    argv = [GL_BIN] + shlex.split(subcmd)
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True)
+    except FileNotFoundError:
+        return ""
     return r.stdout.strip()
 
 def f(val) -> float:
     try: return float(val or 0)
-    except: return 0.0
+    except (TypeError, ValueError): return 0.0
 
 # ── Step 1: Pull smart money context + trader addresses ───────────────────────
 
@@ -195,6 +204,7 @@ def profile_pnl(address: str, chain: str = CHAIN) -> tuple[int, float]:
 def make_did(tag: str) -> str:
     dir_path = f"/tmp/gitlawb-poc-{tag}"
     Path(dir_path).mkdir(exist_ok=True)
+    DID_DIRS.append(dir_path)
     gl(f"identity new --dir {dir_path} --force")
     did = gl(f"identity show --dir {dir_path}")
     return did if did.startswith("did:key:") else "did:key:[generated]"
@@ -355,4 +365,9 @@ if __name__ == "__main__":
     if not os.environ.get("NANSEN_API_KEY"):
         print("ERROR: set NANSEN_API_KEY first")
         sys.exit(1)
-    main()
+    try:
+        main()
+    finally:
+        # Remove generated Ed25519 DID key material from /tmp after the run.
+        for d in DID_DIRS:
+            shutil.rmtree(d, ignore_errors=True)
