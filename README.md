@@ -8,7 +8,22 @@ Pulls live Smart Money wallets from Nansen, profiles their on-chain activity,
 and generates a real gitlawb DID (Ed25519) for each — producing a ranked
 **Smart Developer Leaderboard**: on-chain credibility scores for crypto OSS contributors.
 
+> Note: the repo names paired with wallets in the leaderboard output
+> (e.g. `defi-core/yield-optimizer`) are **fictional demo data** for the
+> hackathon, not real gitlawb repositories.
+
 Not just GitHub stars. Real skin in the game.
+
+## Prerequisites
+
+- Python 3.10+
+- `nansen-cli` — install globally: `npm install -g nansen-cli` (version unpinned;
+  the script assumes its current JSON output shape)
+- `gl` (gitlawb CLI) — build from source: `git clone https://github.com/gitlawb/gitlawb`
+  then `cargo build --release`; put `target/release/gl` on your `PATH`,
+  or point `GL_BIN` at it
+- A paid Nansen API key — export it as `NANSEN_API_KEY` (the script exits
+  if the key is unset or Nansen reports `CREDITS_EXHAUSTED`)
 
 ## How to run
 
